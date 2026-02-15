@@ -2,7 +2,8 @@
  * OpenClaw Memory (Mem0) Plugin
  *
  * Long-term memory via Mem0 — supports both the Mem0 platform
- * and the open-source self-hosted SDK. Uses the official `mem0ai` package.
+ * and the open-source self-hosted SDK. Platform mode uses the `mem0ai` package;
+ * open-source mode uses a vendored build with lazy provider imports.
  *
  * Features:
  * - 5 tools: memory_search, memory_list, memory_store, memory_get, memory_forget
@@ -218,7 +219,7 @@ class OSSProvider implements Mem0Provider {
   }
 
   private async _init(): Promise<void> {
-    const { Memory } = await import("mem0ai/oss");
+    const { Memory } = await import("./vendor/mem0-oss.mjs");
 
     const config: Record<string, unknown> = { version: "v1.1" };
 
@@ -1274,7 +1275,7 @@ const memoryPlugin = {
           );
 
           return {
-            systemContext: `<relevant-memories>\nThe following memories may be relevant to this conversation:\n${memoryContext}\n</relevant-memories>`,
+            prependContext: `<relevant-memories>\nThe following memories may be relevant to this conversation:\n${memoryContext}\n</relevant-memories>`,
           };
         } catch (err) {
           api.logger.warn(`openclaw-mem0: recall failed: ${String(err)}`);

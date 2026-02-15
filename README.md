@@ -1,155 +1,105 @@
-# @mem0/openclaw-mem0
+# openclaw-mem0
 
-Long-term memory for [OpenClaw](https://github.com/openclaw/openclaw) agents, powered by [Mem0](https://mem0.ai).
+Long-term memory plugin for [OpenClaw](https://openclaw.ai) agents, powered by [Mem0](https://mem0.ai).
 
-Your agent forgets everything between sessions. This plugin fixes that. It watches conversations, extracts what matters, and brings it back when relevant — automatically.
+Supports both the Mem0 cloud platform and self-hosted open-source deployments using any OpenAI-compatible provider (OpenRouter, DashScope, LocalAI, etc).
 
-## How it works
+## Features
 
-<p align="center">
-  <img src="assets/architecture.png" alt="Architecture" width="800" />
-</p>
+- **5 memory tools** — `memory_search`, `memory_store`, `memory_list`, `memory_get`, `memory_forget`
+- **Session + long-term scopes** — short-term (session) and long-term (user) memory
+- **Auto-recall** — injects relevant memories before each agent turn
+- **Auto-capture** — stores key facts after each agent turn
+- **Dual mode** — Mem0 platform (cloud) or open-source (self-hosted)
+- **Provider-agnostic** — works with OpenRouter, DashScope, LocalAI, or any OpenAI-compatible API
+- **Lazy provider loading** — only loads the SDKs you actually use, no bloated installs
 
-**Auto-Recall** — Before the agent responds, the plugin searches Mem0 for memories that match the current message and injects them into context.
-
-**Auto-Capture** — After the agent responds, the plugin sends the exchange to Mem0. Mem0 decides what's worth keeping — new facts get stored, stale ones updated, duplicates merged.
-
-Both run silently. No prompting, no configuration, no manual calls.
-
-### Short-term vs long-term memory
-
-Memories are organized into two scopes:
-
-- **Session (short-term)** — Auto-capture stores memories scoped to the current session via Mem0's `run_id` / `runId` parameter. These are contextual to the ongoing conversation and automatically recalled alongside long-term memories.
-
-- **User (long-term)** — The agent can explicitly store long-term memories using the `memory_store` tool (with `longTerm: true`, the default). These persist across all sessions for the user.
-
-During **auto-recall**, the plugin searches both scopes and presents them separately — long-term memories first, then session memories — so the agent has full context.
-
-The agent tools (`memory_search`, `memory_list`) accept a `scope` parameter (`"session"`, `"long-term"`, or `"all"`) to control which memories are queried. The `memory_store` tool accepts a `longTerm` boolean (default: `true`) to choose where to store.
-
-All new parameters are optional and backward-compatible — existing configurations work without changes.
-
-## Setup
+## Install
 
 ```bash
-openclaw plugins install @mem0/openclaw-mem0
+openclaw plugins install github:tensakulabs/openclaw-mem0
 ```
 
-### Platform (Mem0 Cloud)
+## Configuration
 
-Get an API key from [app.mem0.ai](https://app.mem0.ai), then add to your `openclaw.json`:
+Add to your `openclaw.json`:
 
-```json5
-// plugins.entries
-"openclaw-mem0": {
-  "enabled": true,
-  "config": {
-    "apiKey": "${MEM0_API_KEY}",
-    "userId": "your-user-id"
+### Platform mode (Mem0 cloud)
+
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-mem0": {
+        "config": {
+          "mode": "platform",
+          "apiKey": "${MEM0_API_KEY}",
+          "userId": "default",
+          "autoCapture": true,
+          "autoRecall": true
+        }
+      }
+    }
   }
 }
 ```
 
-### Open-Source (Self-hosted)
+### Open-source mode (self-hosted)
 
-No Mem0 key needed. Requires `OPENAI_API_KEY` for default embeddings/LLM.
-
-```json5
-"openclaw-mem0": {
-  "enabled": true,
-  "config": {
-    "mode": "open-source",
-    "userId": "your-user-id"
+```json
+{
+  "plugins": {
+    "entries": {
+      "openclaw-mem0": {
+        "config": {
+          "mode": "open-source",
+          "userId": "default",
+          "autoCapture": true,
+          "autoRecall": true,
+          "oss": {
+            "embedder": {
+              "provider": "openai",
+              "config": {
+                "apiKey": "${OPENROUTER_API_KEY}",
+                "baseURL": "https://openrouter.ai/api/v1",
+                "model": "openai/text-embedding-3-small"
+              }
+            },
+            "vectorStore": {
+              "provider": "qdrant",
+              "config": {
+                "host": "localhost",
+                "port": 6333,
+                "collectionName": "memories"
+              }
+            },
+            "llm": {
+              "provider": "openai",
+              "config": {
+                "apiKey": "${OPENROUTER_API_KEY}",
+                "baseURL": "https://openrouter.ai/api/v1",
+                "model": "openai/gpt-4o-mini"
+              }
+            }
+          }
+        }
+      }
+    }
   }
 }
 ```
 
-Sensible defaults out of the box. To customize the embedder, vector store, or LLM:
+## What's different from the official plugin
 
-```json5
-"config": {
-  "mode": "open-source",
-  "userId": "your-user-id",
-  "oss": {
-    "embedder": { "provider": "openai", "config": { "model": "text-embedding-3-small" } },
-    "vectorStore": { "provider": "qdrant", "config": { "host": "localhost", "port": 6333 } },
-    "llm": { "provider": "openai", "config": { "model": "gpt-4o" } }
-  }
-}
-```
+The official `@mem0/openclaw-mem0` has several issues that break self-hosted deployments:
 
-All `oss` fields are optional. See [Mem0 OSS docs](https://docs.mem0.ai/open-source/node-quickstart) for providers.
+1. **Auto-recall silently discards memories** — wrong property name in the hook return ([mem0ai/mem0#4037](https://github.com/mem0ai/mem0/issues/4037))
+2. **Embeddings ignore your `baseURL`** — always hits `api.openai.com` instead of your configured provider ([mem0ai/mem0#4040](https://github.com/mem0ai/mem0/issues/4040))
+3. **Missing provider SDKs crash at startup** — `mem0ai` eagerly imports 17 provider SDKs regardless of which you use
+4. **Qdrant version warnings** — noisy compatibility warnings with newer Qdrant servers
 
-## Agent tools
-
-The agent gets five tools it can call during conversations:
-
-| Tool | Description |
-|------|-------------|
-| `memory_search` | Search memories by natural language |
-| `memory_list` | List all stored memories for a user |
-| `memory_store` | Explicitly save a fact |
-| `memory_get` | Retrieve a memory by ID |
-| `memory_forget` | Delete by ID or by query |
-
-## CLI
-
-```bash
-# Search all memories (long-term + session)
-openclaw mem0 search "what languages does the user know"
-
-# Search only long-term memories
-openclaw mem0 search "what languages does the user know" --scope long-term
-
-# Search only session/short-term memories
-openclaw mem0 search "what languages does the user know" --scope session
-
-# Stats
-openclaw mem0 stats
-```
-
-## Options
-
-### General
-
-| Key | Type | Default | |
-|-----|------|---------|---|
-| `mode` | `"platform"` \| `"open-source"` | `"platform"` | Which backend to use |
-| `userId` | `string` | `"default"` | Scope memories per user |
-| `autoRecall` | `boolean` | `true` | Inject memories before each turn |
-| `autoCapture` | `boolean` | `true` | Store facts after each turn |
-| `topK` | `number` | `5` | Max memories per recall |
-| `searchThreshold` | `number` | `0.3` | Min similarity (0–1) |
-
-### Platform mode
-
-| Key | Type | Default | |
-|-----|------|---------|---|
-| `apiKey` | `string` | — | **Required.** Mem0 API key (supports `${MEM0_API_KEY}`) |
-| `orgId` | `string` | — | Organization ID |
-| `projectId` | `string` | — | Project ID |
-| `enableGraph` | `boolean` | `false` | Entity graph for relationships |
-| `customInstructions` | `string` | *(built-in)* | Extraction rules — what to store, how to format |
-| `customCategories` | `object` | *(12 defaults)* | Category name → description map for tagging |
-
-### Open-source mode
-
-Works with zero extra config. The `oss` block lets you swap out any component:
-
-| Key | Type | Default | |
-|-----|------|---------|---|
-| `customPrompt` | `string` | *(built-in)* | Extraction prompt for memory processing |
-| `oss.embedder.provider` | `string` | `"openai"` | Embedding provider (`"openai"`, `"ollama"`, etc.) |
-| `oss.embedder.config` | `object` | — | Provider config: `apiKey`, `model`, `baseURL` |
-| `oss.vectorStore.provider` | `string` | `"memory"` | Vector store (`"memory"`, `"qdrant"`, `"chroma"`, etc.) |
-| `oss.vectorStore.config` | `object` | — | Provider config: `host`, `port`, `collectionName`, `dimension` |
-| `oss.llm.provider` | `string` | `"openai"` | LLM provider (`"openai"`, `"anthropic"`, `"ollama"`, etc.) |
-| `oss.llm.config` | `object` | — | Provider config: `apiKey`, `model`, `baseURL`, `temperature` |
-| `oss.historyDbPath` | `string` | — | SQLite path for memory edit history |
-
-Everything inside `oss` is optional — defaults use OpenAI embeddings (`text-embedding-3-small`), in-memory vector store, and OpenAI LLM. Override only what you need.
+This plugin fixes all of these. It vendors a patched build of the mem0 OSS module with lazy dynamic imports — only the SDKs you actually configure get loaded.
 
 ## License
 
-Apache 2.0
+Apache-2.0

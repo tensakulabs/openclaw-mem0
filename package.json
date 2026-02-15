@@ -1,8 +1,8 @@
 {
-  "name": "@mem0/openclaw-mem0",
-  "version": "0.1.0",
+  "name": "@tensakulabs/openclaw-mem0",
+  "version": "1.0.0",
   "type": "module",
-  "description": "Mem0 memory backend for OpenClaw — platform or self-hosted open-source",
+  "description": "Long-term memory plugin for OpenClaw agents, powered by Mem0",
   "license": "Apache-2.0",
   "keywords": [
     "openclaw",
@@ -12,8 +12,13 @@
     "long-term-memory"
   ],
   "dependencies": {
+    "@qdrant/js-client-rest": "^1.13.0",
     "@sinclair/typebox": "0.34.47",
-    "mem0ai": "^2.2.1"
+    "mem0ai": "^2.2.2",
+    "openai": "^4.93.0",
+    "sqlite3": "5.1.7",
+    "uuid": "^9.0.1",
+    "zod": "^3.24.1"
   },
   "openclaw": {
     "extensions": [

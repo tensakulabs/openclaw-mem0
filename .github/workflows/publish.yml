@@ -3,56 +3,52 @@ name: Release & Publish
 on:
   push:
     branches: [main]
-    paths: [package.json]
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     permissions:
       contents: write
       id-token: write
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-
-      - name: Check version change
-        id: version
-        run: |
-          NEW=$(node -p "require('./package.json').version")
-          OLD=$(git show HEAD~1:package.json 2>/dev/null | node -p "JSON.parse(require('fs').readFileSync('/dev/stdin','utf8')).version" 2>/dev/null || echo "0.0.0")
-          if [ "$NEW" != "$OLD" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "version=$NEW" >> "$GITHUB_OUTPUT"
-            echo "Version changed: $OLD → $NEW"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "Version unchanged: $NEW"
-          fi
-
-      - name: Create tag and release
-        if: steps.version.outputs.changed == 'true'
-        run: |
-          git tag "v${{ steps.version.outputs.version }}"
-          git push origin "v${{ steps.version.outputs.version }}"
-          gh release create "v${{ steps.version.outputs.version }}" \
-            --title "v${{ steps.version.outputs.version }}" \
-            --generate-notes
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
-        if: steps.version.outputs.changed == 'true'
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      - name: Bump patch version
+        id: version
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          NEW=$(npm version patch --no-git-tag-version)
+          echo "version=$NEW" >> "$GITHUB_OUTPUT"
+          echo "Bumped to $NEW"
+
+      - name: Commit, tag, and push
+        run: |
+          git add package.json
+          git commit -m "release: ${{ steps.version.outputs.version }} [skip ci]"
+          git tag "${{ steps.version.outputs.version }}"
+          git push origin main --tags
+
+      - name: Create GitHub release
+        run: |
+          gh release create "${{ steps.version.outputs.version }}" \
+            --title "${{ steps.version.outputs.version }}" \
+            --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Verify package contents
-        if: steps.version.outputs.changed == 'true'
         run: npm pack --dry-run
 
       - name: Publish to npm
-        if: steps.version.outputs.changed == 'true'
         run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

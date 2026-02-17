@@ -4,12 +4,23 @@
   "type": "module",
   "description": "Long-term memory plugin for OpenClaw agents, powered by Mem0",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tensakulabs/openclaw-mem0"
+  },
   "keywords": [
     "openclaw",
     "plugin",
     "memory",
     "mem0",
     "long-term-memory"
+  ],
+  "files": [
+    "index.ts",
+    "vendor/",
+    "openclaw.plugin.json",
+    "LICENSE",
+    "README.md"
   ],
   "dependencies": {
     "@qdrant/js-client-rest": "^1.13.0",

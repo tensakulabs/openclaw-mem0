@@ -1,6 +1,6 @@
 {
   "name": "@tensakulabs/openclaw-mem0",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Long-term memory plugin for OpenClaw agents, powered by Mem0",
   "license": "Apache-2.0",

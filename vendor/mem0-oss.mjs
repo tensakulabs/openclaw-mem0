@@ -2606,6 +2606,7 @@ function getUpdateMemoryMessages(retrievedOldMemory, newRetrievedFacts) {
   Do not return anything except the JSON format.`;
 }
 function removeCodeBlocks(text) {
+  if (typeof text !== "string") return String(text ?? "");
   return text.replace(/```[^`]*```/g, "");
 }
 
